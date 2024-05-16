@@ -9,6 +9,9 @@ import { ApiResponseDto } from '../utilities/dto/api-response.dto';
 import { BcryptService } from '../utilities/bcrypt/bcrypt.service';
 import { MemoryStorageFile } from '@blazity/nest-file-fastify';
 import { UserAvatarDto } from './dto/user-avatar.dto';
+import { MailHandler } from '../utilities/mailer/mail.handler';
+import { ConfigService } from '@nestjs/config';
+import { GenericTemplate } from 'src/resources/mail-templates/generic.template';
 
 @Injectable()
 export class UserService {
@@ -16,7 +19,9 @@ export class UserService {
   constructor(
     @InjectModel(User.name) private UserModel: Model<User>,
     @InjectModel(UserAvatar.name) private UserAvatarModel: Model<UserAvatar>,
+    private readonly configService: ConfigService,
     private readonly bcryptService: BcryptService,
+    private readonly mailer: MailHandler,
   ) {}
 
   async createUser(createUserDto: CreateUserDto, avatar: MemoryStorageFile[]): Promise<UserDto> {
@@ -29,6 +34,7 @@ export class UserService {
     });
     let userDto = new UserDto(await user.save());
     if (avatar) userDto.avatar = await this.uploadUserAvatar(generatedId, avatar);
+    this.sendUserCreatedMail(userDto);
     return userDto;
   }
 
@@ -83,6 +89,30 @@ export class UserService {
       fileBase64: avatar[0].buffer.toString('base64'),
     });
     return new UserAvatarDto(await userAvatar.save())
+  }
+
+  private async sendUserCreatedMail(user: UserDto) {
+    try {
+      await this.mailer.sendMail(
+        user.email,
+        'Notification of User Creation',
+        GenericTemplate(
+            this.configService.get<string>('WEBSITE_URL'),
+            `${user.firstName}, ${user.lastName}`,
+            `Your profile has been created with the details <br>
+            FirstName: ${user.firstName},<br>
+            LastName: ${user.lastName},<br>
+            Email: ${user.email},<br>
+            ID: ${user.id},<br>
+            Profile image: ${user.avatar ? `<a href="${user.avatar.url}" target="_blank">avatar image</a>` : 'N/A'} <br>
+            `
+        ),
+        `${this.configService.get<string>('APP_NAME')} 
+        ${this.configService.get<string>('SMTP_USERNAME')}`,
+    );
+    } catch (error) {
+      console.log('Failed to send email notification to '+user.email);
+    }
   }
 
 }
