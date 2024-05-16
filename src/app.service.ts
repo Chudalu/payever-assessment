@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import { ApiResponseDto } from './modules/utilities/dto/api-response.dto';
 
 @Injectable()
 export class AppService {
-  getHello(): string {
-    return 'Hello World!';
+  
+  constructor() {}
+  
+  getHealth(): ApiResponseDto {
+    return new ApiResponseDto('Server is healthy');
   }
 }
