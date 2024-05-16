@@ -7,7 +7,13 @@ export class UserAvatar {
     userId: string;
 
     @Prop({ required: true })
-    file: string;
+    fileBase64: string;
+
+    @Prop({ required: true })
+    mimeType: string;
+
+    @Prop()
+    size: number;
 }
 export type UserAvatarDocument = HydratedDocument<UserAvatar>;
 export const UserAvatarSchema = SchemaFactory.createForClass(UserAvatar);

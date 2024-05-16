@@ -8,6 +8,7 @@ import { UserDto } from './dto/user.dto';
 import { ApiResponseDto } from '../utilities/dto/api-response.dto';
 import { BcryptService } from '../utilities/bcrypt/bcrypt.service';
 import { MemoryStorageFile } from '@blazity/nest-file-fastify';
+import { UserAvatarDto } from './dto/user-avatar.dto';
 
 @Injectable()
 export class UserService {
@@ -19,25 +20,24 @@ export class UserService {
   ) {}
 
   async createUser(createUserDto: CreateUserDto, avatar: MemoryStorageFile[]): Promise<UserDto> {
-    let existingUser = await this.UserModel.findOne({ email: createUserDto.email });
-    if (existingUser) throw new ConflictException('User with email already exists');
+    if (await this.UserModel.findOne({ email: createUserDto.email })) 
+    throw new ConflictException('User with email already exists');
     let generatedId = this.generateId();
-    this.uploadUserAvatar(generatedId, avatar);
-    throw new BadRequestException();
     let user = new this.UserModel({
-      ...createUserDto,
-      id: generatedId,
+      ...createUserDto, id: generatedId,
       password: await this.bcryptService.hash(createUserDto.password),
     });
-    return new UserDto(await user.save());
+    let userDto = new UserDto(await user.save());
+    if (avatar) userDto.avatar = await this.uploadUserAvatar(generatedId, avatar);
+    return userDto;
   }
 
   async getUser(id: string): Promise<UserDto> {
     let user = await this.UserModel.findOne({ id }).exec();
     if (!user) throw new NotFoundException('User not found');
-    let userAvatar = await this.getUserAvatar(user.id);
     let userDto = new UserDto(user);
-    if (userAvatar) userDto.avatar = userAvatar.file;
+    try { userDto.avatar = await this.getUserAvatar(user.id ) } 
+    catch (error) { return userDto; }
     return userDto;
   }
 
@@ -46,9 +46,21 @@ export class UserService {
     return users.map(u => new UserDto(u));
   }
 
+  async getUserAvatar(userId: string): Promise<UserAvatarDto> {
+    let userAvatar = await this.UserAvatarModel.findOne({ userId });
+    if (!userAvatar) throw new NotFoundException('Avatar not found');
+    return new UserAvatarDto(userAvatar);
+  }
+
   async removeUser(id: string): Promise<ApiResponseDto> {
+    await this.UserAvatarModel.deleteOne({ userId: id });
     await this.UserModel.deleteOne({ id });
     return new ApiResponseDto('User deleted');
+  }
+
+  async removeUserAvatar(userId: string): Promise<ApiResponseDto> {
+    await this.UserAvatarModel.deleteOne({ userId });
+    return new ApiResponseDto('Avatar deleted');
   }
 
   private generateId(length?: number) {
@@ -60,18 +72,17 @@ export class UserService {
         let index = Math.random() * charactersLength;
         ID += chars.charAt(index);
     }
-    return ID + new Date().getMilliseconds();
+    return ID + Date.now();
   }
 
-  private async uploadUserAvatar(userId: string, avatar: MemoryStorageFile[]) {
-    console.log(userId, avatar);
+  private async uploadUserAvatar(userId: string, avatar: MemoryStorageFile[]): Promise<UserAvatarDto> {
+    let userAvatar = new this.UserAvatarModel({
+      userId,
+      size: avatar[0].size,
+      mimeType: avatar[0].mimetype,
+      fileBase64: avatar[0].buffer.toString('base64'),
+    });
+    return new UserAvatarDto(await userAvatar.save())
   }
 
-  async getUserAvatar(userId: string): Promise<UserAvatar> {
-    return await this.UserAvatarModel.findOne({ userId });
-  }
-
-  private convertToBase64(file: any) {
-
-  }
 }

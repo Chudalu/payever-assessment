@@ -1,11 +1,10 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus, UseInterceptors } from '@nestjs/common';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
 import { ApiTags } from '@nestjs/swagger';
 import { UserDto } from './dto/user.dto';
-import { UserAvatar } from './entities/user-avatar.entity';
 import { FileFieldsInterceptor, MemoryStorageFile, UploadedFiles } from '@blazity/nest-file-fastify';
+import { UserAvatarDto } from './dto/user-avatar.dto';
 
 @ApiTags('User')
 @Controller('user')
@@ -17,27 +16,32 @@ export class UserController {
     { name: 'avatar', maxCount: 1 },
   ]))
   @Post()
-  create(@Body() createUserDto: CreateUserDto, @UploadedFiles() file: { avatar: MemoryStorageFile[]}) {
+  createUser(@Body() createUserDto: CreateUserDto, @UploadedFiles() file: { avatar: MemoryStorageFile[]}) {
     return this.userService.createUser(createUserDto, file.avatar);
   }
 
   @Get()
-  async findAll(): Promise<UserDto[]> {
+  async getAllUsers(): Promise<UserDto[]> {
     return await this.userService.getAllUsers();
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string): Promise<UserDto> {
+  async getUser(@Param('id') id: string): Promise<UserDto> {
     return await this.userService.getUser(id);
   }
 
   @Get(':id/avatar')
-  async getUserAvatar(@Param('id') id: string): Promise<UserAvatar> {
+  async getUserAvatar(@Param('id') id: string): Promise<UserAvatarDto> {
     return await this.userService.getUserAvatar(id);
   }
 
   @Delete(':id')
-  async remove(@Param('id') id: string) {
+  async removeUser(@Param('id') id: string) {
     return await this.userService.removeUser(id);
+  }
+
+  @Delete(':id/avatar')
+  async removeUserAvatar(@Param('id') id: string) {
+    return await this.userService.removeUserAvatar(id);
   }
 }
